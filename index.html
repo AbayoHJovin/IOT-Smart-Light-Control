@@ -4,8 +4,117 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Light Control App</title>
-    <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #74ebd5, #acb6e5);
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .light-bulb {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 30px;
+            background: #ccc;
+            border-radius: 50%;
+            position: relative;
+            transition: background 0.3s ease;
+        }
+
+        .light-bulb.on {
+            background: #ffeb3b;
+            box-shadow: 0 0 20px #ffeb3b, 0 0 40px #ffeb3b;
+        }
+
+        .bulb-inner {
+            width: 60px;
+            height: 60px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.8;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            color: white;
+            transition: transform 0.2s ease, background 0.3s ease;
+        }
+
+        #on-btn {
+            background: #28a745;
+        }
+
+        #on-btn:hover {
+            background: #218838;
+            transform: scale(1.1);
+        }
+
+        #off-btn {
+            background: #dc3545;
+        }
+
+        #off-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        #status {
+            font-size: 1.2em;
+            margin-top: 20px;
+            animation: fadeIn 0.5s ease-in-out;
+            transition: color 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -19,6 +128,104 @@
         </div>
         <p id="status">Status: Waiting for command...</p>
     </div>
-    <script src="script.js"></script>
+    <script>
+        // MQTT Broker Configuration
+        // Option 1: Use test.mosquitto.org (recommended for public testing)
+        const host = 'wss://test.mosquitto.org:8081/mqtt';
+        // Option 2: Use broker.hivemq.com (alternative public broker)
+        // const host = 'wss://broker.hivemq.com:8000/mqtt';
+        // Option 3: Use local Mosquitto broker (if set up locally)
+        // const host = 'ws://localhost:9001/mqtt'; // Note: Use ws:// for local, not wss://
+
+        const clientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8);
+        const controlTopic = '/student_group/light_control';
+        const statusTopic = '/student_group/light_status';
+        const options = {
+            clientId: clientId,
+            protocolId: 'MQTT',
+            protocolVersion: 4
+        };
+
+        // Connect to MQTT Broker
+        const client = mqtt.connect(host, options);
+
+        // DOM Elements
+        const onButton = document.getElementById('on-btn');
+        const offButton = document.getElementById('off-btn');
+        const statusText = document.getElementById('status');
+        const bulb = document.getElementById('bulb');
+
+        // Function to update UI based on device status
+        function updateDeviceStatus(isOnline) {
+            if (isOnline) {
+                onButton.disabled = false;
+                offButton.disabled = false;
+                onButton.style.opacity = 1;
+                offButton.style.opacity = 1;
+                statusText.textContent = 'Status: Device is online. Waiting for command...';
+                statusText.style.color = '#28a745'; // Green for online
+            } else {
+                onButton.disabled = true;
+                offButton.disabled = true;
+                onButton.style.opacity = 0.5;
+                offButton.style.opacity = 0.5;
+                statusText.textContent = 'Status: Device is offline. Please restart the IoT simulation.';
+                statusText.style.color = '#dc3545'; // Red for offline
+                bulb.classList.remove('on'); // Turn off bulb if device is offline
+            }
+        }
+
+        // Handle connection to MQTT broker
+        client.on('connect', () => {
+            console.log('Connected to MQTT broker');
+            // Subscribe to the status topic to monitor device status
+            client.subscribe(statusTopic, (err) => {
+                if (!err) {
+                    console.log(`Subscribed to ${statusTopic}`);
+                } else {
+                    console.error('Subscription error:', err);
+                }
+            });
+        });
+
+        client.on('error', (err) => {
+            console.error('Connection error: ', err);
+            client.end();
+            updateDeviceStatus(false); // Assume device is offline on connection error
+        });
+
+        // Handle incoming messages
+        client.on('message', (topic, message) => {
+            console.log(`Received message on ${topic}: ${message.toString()}`); // Debug log
+            if (topic === statusTopic) {
+                const status = message.toString();
+                if (status === 'online') {
+                    console.log('Device is online');
+                    updateDeviceStatus(true);
+                } else if (status === 'offline') {
+                    console.log('Device is offline');
+                    updateDeviceStatus(false);
+                }
+            }
+        });
+
+        // Button Click Events
+        onButton.addEventListener('click', () => {
+            client.publish(controlTopic, 'ON');
+            statusText.textContent = 'Status: Light is TURNED ON';
+            statusText.style.color = '#28a745'; // Green for ON
+            bulb.classList.add('on');
+        });
+
+        offButton.addEventListener('click', () => {
+            client.publish(controlTopic, 'OFF');
+            statusText.textContent = 'Status: Light is TURNED OFF';
+            statusText.style.color = '#dc3545'; // Red for OFF
+            bulb.classList.remove('on');
+        });
+
+        // Initially assume device is offline until we receive a status message
+        updateDeviceStatus(false);
+    </script>
 </body>
 </html>
