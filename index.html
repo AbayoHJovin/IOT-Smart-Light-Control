@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light Control App</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Light Control</h1>
+        <div class="light-bulb" id="bulb">
+            <div class="bulb-inner"></div>
+        </div>
+        <div class="buttons">
+            <button id="on-btn" class="btn">Turn ON</button>
+            <button id="off-btn" class="btn">Turn OFF</button>
+        </div>
+        <p id="status">Status: Waiting for command...</p>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
